@@ -33,8 +33,8 @@
 
 #include "PxPhysicsAPI.h"
 
-#include "../snippetrender/SnippetRender.h"
-#include "../snippetrender/SnippetCamera.h"
+#include "SnippetRender.h"
+#include "SnippetCamera.h"
 
 using namespace physx;
 

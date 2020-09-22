@@ -114,8 +114,9 @@ void initPhysics(bool interactive)
 	PxRigidStatic* groundPlane = PxCreatePlane(*gPhysics, PxPlane(0,1,0,0), *gMaterial);
 	gScene->addActor(*groundPlane);
 
-	for(PxU32 i=0;i<5;i++)
-		createStack(PxTransform(PxVec3(0,0,stackZ-=10.0f)), 10, 2.0f);
+	//for(PxU32 i=0;i<5;i++)
+	//	createStack(PxTransform(PxVec3(0,0,stackZ-=10.0f)), 10, 2.0f);
+	createStack(PxTransform(PxVec3(0, 50, stackZ -= 10.0f)), 1, 8.0f);
 
 	if(!interactive)
 		createDynamic(PxTransform(PxVec3(0,40,100)), PxSphereGeometry(10), PxVec3(0,-50,-100));
