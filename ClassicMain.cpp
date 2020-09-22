@@ -26,7 +26,7 @@
 // Copyright (c) 2008-2019 NVIDIA Corporation. All rights reserved.
 // Copyright (c) 2004-2008 AGEIA Technologies, Inc. All rights reserved.
 // Copyright (c) 2001-2004 NovodeX AG. All rights reserved.  
-
+	
 extern int snippetMain(int, const char*const*);
 
 int main(int argc, char** argv)
