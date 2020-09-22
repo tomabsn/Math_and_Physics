@@ -68,6 +68,12 @@ PxRigidDynamic* createDynamic(const PxTransform& t, const PxGeometry& geometry, 
 	return dynamic;
 }
 
+/*
+* paramètre ==
+* t = coordonnée de l'objet à faire apparaitre
+* size = taille de la pyramide
+* halfExtent = taille des cubes 
+*/
 void createStack(const PxTransform& t, PxU32 size, PxReal halfExtent)
 {
 	PxShape* shape = gPhysics->createShape(PxBoxGeometry(halfExtent, halfExtent, halfExtent), *gMaterial);
@@ -116,7 +122,7 @@ void initPhysics(bool interactive)
 
 	//for(PxU32 i=0;i<5;i++)
 	//	createStack(PxTransform(PxVec3(0,0,stackZ-=10.0f)), 10, 2.0f);
-	createStack(PxTransform(PxVec3(0, 50, stackZ -= 10.0f)), 1, 8.0f);
+	createStack(PxTransform(PxVec3(10, 30, stackZ -= 10.0f)), 1, 10.0f);
 
 	if(!interactive)
 		createDynamic(PxTransform(PxVec3(0,40,100)), PxSphereGeometry(10), PxVec3(0,-50,-100));
