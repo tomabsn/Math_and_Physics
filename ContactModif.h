@@ -64,7 +64,7 @@ public:
 					}
 					break;
 					case FilterGroup::eBALLUP:
-						ball->setLinearVelocity(PxVec3{ 0, 20, 0 });
+						ball->setLinearVelocity(PxVec3{ 0, 50, 0 });
 						break;
 						//default:
 						//	break;
