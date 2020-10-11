@@ -35,8 +35,13 @@
 // ****************************************************************************
 
 #include <ctype.h>
+#include <chrono>
+using namespace std;
+using namespace chrono;
 
 #include "PxPhysicsAPI.h"
+#include "ContactModif.h"
+#include "Ball.h"
 
 #include "../snippetcommon/SnippetPrint.h"
 #include "../snippetcommon/SnippetPVD.h"
@@ -59,36 +64,51 @@ PxPvd*                  gPvd        = NULL;
 
 PxReal stackZ = 10.0f;
 
-PxRigidDynamic* createDynamic(const PxTransform& t, const PxGeometry& geometry, const PxVec3& velocity=PxVec3(0))
+ContactModif contactModif;
+
+auto timeNow = high_resolution_clock::now();
+auto timeBefore = high_resolution_clock::now();
+FilterGroup lastBall = FilterGroup::eBALLR;
+
+PxFilterFlags BallPxFilterShader(
+	PxFilterObjectAttributes attributes0, PxFilterData filterData0,
+	PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
-	PxRigidDynamic* dynamic = PxCreateDynamic(*gPhysics, t, geometry, *gMaterial, 10.0f);
-	dynamic->setAngularDamping(0.5f);
-	dynamic->setLinearVelocity(velocity);
-	gScene->addActor(*dynamic);
-	return dynamic;
+	// let triggers throughrintf
+	if (PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
+	{
+		pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
+		return PxFilterFlag::eDEFAULT;
+	}
+	// generate contacts for all that were not filtered above
+	pairFlags = PxPairFlag::eCONTACT_DEFAULT;
+
+	// trigger the contact callback for pairs (A,B) where
+	// the filtermask of A contains the ID of B and vice versa.
+	if ((filterData0.word0 & filterData1.word1) && (filterData1.word0 & filterData0.word1)) {
+		//printf("Hello collision vegergbregbb\n");
+		pairFlags |= PxPairFlag::eNOTIFY_TOUCH_FOUND | PxPairFlag::eMODIFY_CONTACTS;
+	}
+
+	return PxFilterFlag::eDEFAULT;
 }
 
-/*
-* paramètre ==
-* t = coordonnée de l'objet à faire apparaitre
-* size = taille de la pyramide
-* halfExtent = taille des cubes 
-*/
-void createStack(const PxTransform& t, PxU32 size, PxReal halfExtent)
+void setupFiltering(PxRigidActor* actor, PxU32 filterGroup, PxU32 filterMask)
 {
-	PxShape* shape = gPhysics->createShape(PxBoxGeometry(halfExtent, halfExtent, halfExtent), *gMaterial);
-	for(PxU32 i=0; i<size;i++)
+	PxFilterData filterData;
+	filterData.word0 = filterGroup;
+	filterData.word1 = filterMask;
+	
+	const PxU32 numShapes = actor->getNbShapes();
+	PxShape** shapes = (PxShape**)malloc(sizeof(PxShape*) * numShapes);
+	actor->getShapes(shapes, numShapes);
+	for (PxU32 i = 0; i < numShapes; i++)
 	{
-		for(PxU32 j=0;j<size-i;j++)
-		{
-			PxTransform localTm(PxVec3(PxReal(j*2) - PxReal(size-i), PxReal(i*2+1), 0) * halfExtent);
-			PxRigidDynamic* body = gPhysics->createRigidDynamic(t.transform(localTm));
-			body->attachShape(*shape);
-			PxRigidBodyExt::updateMassAndInertia(*body, 10.0f);
-			gScene->addActor(*body);
-		}
+		PxShape* shape = shapes[i];
+		shape->setSimulationFilterData(filterData);
 	}
-	shape->release();
+	free(shapes);
 }
 
 void initPhysics(bool interactive)
@@ -102,10 +122,11 @@ void initPhysics(bool interactive)
 	gPhysics = PxCreatePhysics(PX_PHYSICS_VERSION, *gFoundation, PxTolerancesScale(),true,gPvd);
 
 	PxSceneDesc sceneDesc(gPhysics->getTolerancesScale());
-	sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
+	//sceneDesc.gravity = PxVec3(0.0f, -9.81f, 0.0f);
 	gDispatcher = PxDefaultCpuDispatcherCreate(2);
 	sceneDesc.cpuDispatcher	= gDispatcher;
-	sceneDesc.filterShader	= PxDefaultSimulationFilterShader;
+	sceneDesc.filterShader	= BallPxFilterShader;
+	sceneDesc.simulationEventCallback = &contactModif;
 	gScene = gPhysics->createScene(sceneDesc);
 
 	PxPvdSceneClient* pvdClient = gScene->getScenePvdClient();
@@ -120,16 +141,55 @@ void initPhysics(bool interactive)
 	PxRigidStatic* groundPlane = PxCreatePlane(*gPhysics, PxPlane(0,1,0,0), *gMaterial);
 	gScene->addActor(*groundPlane);
 
-	//for(PxU32 i=0;i<5;i++)
-	//	createStack(PxTransform(PxVec3(0,0,stackZ-=10.0f)), 10, 2.0f);
-	createStack(PxTransform(PxVec3(10, 30, stackZ -= 10.0f)), 1, 10.0f);
 
-	if(!interactive)
-		createDynamic(PxTransform(PxVec3(0,40,100)), PxSphereGeometry(10), PxVec3(0,-50,-100));
+	//creation d'un cube de 16x16 
+	PxShape* shape = gPhysics->createShape(PxBoxGeometry(2.0f, 16.0f, 16.0f), *gMaterial, true);
+	PxRigidStatic* body = gPhysics->createRigidStatic(PxTransform(PxVec3(15.0f, 8.0f, 0.0f)));
+	body->attachShape(*shape);
+
+	setupFiltering(body, FilterGroup::eWALL, FilterGroup::eBALLUP | FilterGroup::eBALL | FilterGroup::eBALLT | FilterGroup::eBALLR);
+
+	gScene->addActor(*body);
+	shape->release();
+
 }
 
 void stepPhysics(bool /*interactive*/)
 {
+	timeNow = high_resolution_clock::now();
+	//toutes les 3 secondes je créée une nouvelle balle
+	if (duration_cast<seconds>(timeNow - timeBefore).count() >= 3) {
+		timeBefore = timeNow;
+
+		PxShape* shape = gPhysics->createShape(PxSphereGeometry(1), *gMaterial, true);
+		MyBall* b0{ static_cast<MyBall*>(PxCreateDynamic(*gPhysics, PxTransform(PxVec3(60.0f, 0.0f, 0.0f)), *shape, 10.0f)) };
+
+		switch (lastBall) {
+		case FilterGroup::eBALLR:
+			b0->setType(FilterGroup::eBALL);
+			lastBall = FilterGroup::eBALL;
+			break;
+		case FilterGroup::eBALL:
+			b0->setType(FilterGroup::eBALLT);
+			lastBall = FilterGroup::eBALLT;
+			break;
+		case FilterGroup::eBALLT:
+			b0->setType(FilterGroup::eBALLUP);
+			lastBall = FilterGroup::eBALLUP;
+			break;
+		case FilterGroup::eBALLUP:
+			b0->setType(FilterGroup::eBALLR);
+			lastBall = FilterGroup::eBALLR;
+			break;
+		}
+		
+		b0->setLinearVelocity(PxVec3(-50.0f, 0.0f, 0.0f));
+		setupFiltering(b0, b0->getType(), FilterGroup::eWALL | FilterGroup::eBALLUP | FilterGroup::eBALL | FilterGroup::eBALLT | FilterGroup::eBALLR);
+		gScene->addActor(*b0);
+		contactModif.emplace_back(b0);
+	}
+
+	gScene->setContactModifyCallback(&contactModif);
 	gScene->simulate(1.0f/60.0f);
 	gScene->fetchResults(true);
 }
@@ -147,16 +207,16 @@ void cleanupPhysics(bool /*interactive*/)
 	}
 	PX_RELEASE(gFoundation);
 	
-	printf("SnippetHelloWorld done.\n");
+	printf("End of the game ! See you soon ;).\n");
 }
 
 void keyPress(unsigned char key, const PxTransform& camera)
 {
-	switch(toupper(key))
+	/*switch(toupper(key))
 	{
 	case 'B':	createStack(PxTransform(PxVec3(0,0,stackZ-=10.0f)), 10, 2.0f);						break;
 	case ' ':	createDynamic(camera, PxSphereGeometry(3.0f), camera.rotate(PxVec3(0,0,-1))*200);	break;
-	}
+	}*/
 }
 
 int snippetMain(int, const char*const*)

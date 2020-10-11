@@ -299,7 +299,7 @@ void startRender(const PxVec3& cameraEye, const PxVec3& cameraDir, PxReal clipNe
 	glLoadIdentity();
 	gluLookAt(GLdouble(cameraEye.x), GLdouble(cameraEye.y), GLdouble(cameraEye.z), GLdouble(cameraEye.x + cameraDir.x), GLdouble(cameraEye.y + cameraDir.y), GLdouble(cameraEye.z + cameraDir.z), 0.0, 1.0, 0.0);
 
-	glColor4f(0.4f, 0.4f, 0.4f, 1.0f);
+	glColor4f(1.0f, 0.4f, 0.4f, 1.0f);
 }
 
 void finishRender()
